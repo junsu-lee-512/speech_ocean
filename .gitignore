@@ -1,3 +1,5 @@
+# model outputs
 outputs/
 
+# venv and dependencies
 .venv/
