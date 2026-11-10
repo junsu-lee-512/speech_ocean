@@ -64,14 +64,21 @@ class WhisperPronunciationModel(nn.Module):
 
     def forward(
             self,
-            input_feature: torch.Tensor
+            input_feature: torch.Tensor # [B, 128, L] | large: [B, 128, 30]
     ) -> torch.Tensor:
+
+        # Batch 차원이 없이 오디오 하나만 입력되는 경우
+        if input_feature.ndim==2:
+            input_feature = input_feature.unsqueeze(0)
 
         # Whisper Encoder
         en_outputs = self.encoder(input_feature)
-        en_hidden_states = en_outputs.last_hidden_state
+        en_hidden_states = en_outputs.last_hidden_state # [B, L // 4, D] | large: [B, 750, 1280]
 
-        # 
-        
-        
-        pass
+        # Mean Pooling
+        pooled_output = en_hidden_states.mean(dim=1)
+
+        # Regression Head
+        scores = self.regression_head(pooled_output)
+
+        return scores
