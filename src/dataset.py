@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from typing import ClassVar
-from datasets import load_dataset, Audio
+
+import torch
+from datasets import Audio, load_dataset
 from transformers import AutoFeatureExtractor
+
 
 class SpeechOceanDataset:
     DATA_SPLITS: ClassVar[list[str]] = ['train', 'test']
@@ -44,7 +47,9 @@ class SpeechOceanDataset:
         # 3. 데이터셋에 전처리 함수 적용
         self.dataset = self.dataset.map(
             self.preprocess_function, 
-            remove_columns=self.dataset.column_names)
+            remove_columns=self.dataset.column_names,
+        ) 
+        self.dataset.set_format(type="torch", columns=["input_features", "labels"])
 
     def preprocess_function(self, example):
         # 개별 샘플(example)에서 오디오 배열 추출
@@ -61,5 +66,5 @@ class SpeechOceanDataset:
         return {
             "input_features": processed.input_features[0],
             # Speechocean762의 실제 레이블 구조(accuracy, prosodic 등)에 맞게 매핑
-            "labels": [example["accuracy"], example["prosodic"]] 
+            "labels": [float(example["accuracy"]), float(example["prosodic"])] 
         }
