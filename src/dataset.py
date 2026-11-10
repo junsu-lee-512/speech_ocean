@@ -33,16 +33,18 @@ class SpeechOceanDataset:
 
         model_id = self.SUPPORTED_MODELS[backbone]
 
-        # 1. 전처리 도구(Feature Extractor) 로드
+        # 1. 전처리 도구 로드
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(model_id)
+        self.sr = self.feature_extractor.sampling_rate
 
-        # 2. 데이터셋 로드 (해당 split만 바로 가져오기)
-        # speechocean762 데이터셋의 구조에 맞춰 오디오 샘플링 레이트를 16kHz로 캐스팅
-        self.dataset = load_dataset("speechocean762", split=split)
-        self.dataset = self.dataset.cast_column("audio", Audio(sampling_rate=16000))
+        # 2. 데이터셋 로드
+        self.dataset = load_dataset("mispeech/speechocean762", split=split)
+        self.dataset = self.dataset.cast_column("audio", Audio(sampling_rate=self.sr))
 
-        # 3. 데이터셋에 전처리 함수 적용 (.map 활용)
-        self.dataset = self.dataset.map(self.preprocess_function, remove_columns=self.dataset.column_names)
+        # 3. 데이터셋에 전처리 함수 적용
+        self.dataset = self.dataset.map(
+            self.preprocess_function, 
+            remove_columns=self.dataset.column_names)
 
     def preprocess_function(self, example):
         # 개별 샘플(example)에서 오디오 배열 추출
@@ -51,7 +53,7 @@ class SpeechOceanDataset:
         # Whisper 전용 로그-멜 스펙트로그램으로 변환
         processed = self.feature_extractor(
             audio["array"], 
-            sampling_rate=audio["sampling_rate"], 
+            sampling_rate=self.sr, 
             return_tensors="pt"
         )
         
