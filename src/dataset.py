@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import ClassVar
 
 import torch
+import torch.nn.functional as F
 from datasets import Audio, load_dataset
+from torch.utils.data import DataLoader
 from transformers import AutoFeatureExtractor
 
 
@@ -46,12 +48,12 @@ class SpeechOceanDataset:
 
         # 3. 데이터셋에 전처리 함수 적용
         self.dataset = self.dataset.map(
-            self.preprocess_function, 
+            self.preprocess, 
             remove_columns=self.dataset.column_names,
         ) 
         self.dataset.set_format(type="torch", columns=["input_features", "labels"])
 
-    def preprocess_function(self, example):
+    def preprocess(self, example):
         # 개별 샘플(example)에서 오디오 배열 추출
         audio = example["audio"]
         
@@ -68,3 +70,56 @@ class SpeechOceanDataset:
             # Speechocean762의 실제 레이블 구조(accuracy, prosodic 등)에 맞게 매핑
             "labels": [float(example["accuracy"]), float(example["prosodic"])] 
         }
+
+def pad_audio(spectrogram: torch.Tensor) -> torch.Tensor:
+    """
+    스펙트로그램을 입력으로 받아, 시간축을 기준으로 제로패딩 수행하는 함수.
+    제로패딩된 스펙트로그램은 배치 텐서로 묶여 반환
+    """
+    input_ndim = spectrogram[0].ndim
+
+    # 스펙트로그램의 차원 확인
+    if input_ndim != 2:
+        raise TypeError(
+            "The spectrogram should be two-dimensional",
+            f"ndim:{input_ndim}"
+        )
+
+    # 배치에서 가장 긴 오디오 길이
+    max_len = max(s.shape[-1] for s in spectrogram)
+
+    padded_list = []
+    for s in spectrogram:
+        # 현재 스펙트로그램이 채워야 할 패딩 크기 계산
+        pad_right = max_len - s.shape[-1]
+
+        # 시간축에 제로패딩
+        # F.pad(tensor, (left_pad, right_pad, top_pad, bottom_pad ...))
+        padded_s = F.pad(s, (0, pad_right))
+        padded_list.append(padded_s)
+
+    # 4. 리스트로 모인 텐서들을 하나의 배치 텐서로 묶기 ([Batch, Channels, Max_Len])
+    return torch.stack(padded_list)    
+
+def collate_fn():
+    pass
+
+def build_dataloader(
+    dataset: SpeechOceanDataset,
+    batch_size: int = 8,
+    shuffle: bool = False, # train일 때 True, test일 때 False
+    num_workers: int = 4,
+    drop_last: bool = False,
+    pin_memory: bool = True,
+) -> DataLoader:
+
+    return DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle = shuffle,
+        num_workers=num_workers,
+        drop_last=drop_last,
+        collate_fn=collate_fn,
+        # pin_memory가 True이고, cuda가 있을 때
+        pin_memory=pin_memory and torch.cuda.is_available()
+    )
