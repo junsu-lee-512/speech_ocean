@@ -3,3 +3,5 @@ outputs/
 
 # venv and dependencies
 .venv/
+
+**/.DS_Store
