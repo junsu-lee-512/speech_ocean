@@ -71,6 +71,13 @@ class SpeechOceanDataset:
             "labels": [float(example["accuracy"]), float(example["prosodic"])] 
         }
 
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx: int):
+        return self.dataset[idx]
+
+
 def pad_audio(spectrogram: torch.Tensor) -> torch.Tensor:
     """
     스펙트로그램을 입력으로 받아, 시간축을 기준으로 제로패딩 수행하는 함수.
@@ -101,8 +108,13 @@ def pad_audio(spectrogram: torch.Tensor) -> torch.Tensor:
     # 4. 리스트로 모인 텐서들을 하나의 배치 텐서로 묶기 ([Batch, Channels, Max_Len])
     return torch.stack(padded_list)    
 
-def collate_fn():
-    pass
+
+def collate_fn(batch):
+    inputs = [item['input_features'] for item in batch]
+    labels = [torch.tensor(item['labels']) for item in batch]
+    
+    return pad_audio(inputs), torch.stack(labels)
+
 
 def build_dataloader(
     dataset: SpeechOceanDataset,
