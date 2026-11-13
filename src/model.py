@@ -7,6 +7,7 @@ import torch
 from torch import nn
 from transformers import WhisperModel
 
+logger = logging.getLogger(__name__)
 
 class WhisperPronunciationModel(nn.Module):
 
@@ -37,12 +38,14 @@ class WhisperPronunciationModel(nn.Module):
 
         # 모델 호출
         model_id = self.SUPPORTED_MODELS[backbone]
+        logger.info(f"[model.py] Loading model... (selected model: {model_id})")
         _model = WhisperModel.from_pretrained(model_id, torch_dtype=torch.float16)
         self.encoder = _model.encoder.to(torch.float32)     # float16는 attn 연산 시 생기는 작은 값을 표현할 수 없음 (안정성이 떨어짐), 다운스트림 레이어와의 호환성 문제 있음
         del _model      # 메모리 확보를 위해 전체 모델 삭제
 
         # freeze 구현
         if freeze_backbone:
+            logger.info("[model.py] Freezing backbone parameters...")
             for p in self.encoder.parameters():
                 p.requires_grad_(False)
     
